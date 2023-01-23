@@ -851,10 +851,30 @@ class _state(param.Parameterized):
 
     @property
     def access_token(self) -> str | None:
-        """
-        Returns the OAuth access_token if enabled.
-        """
-        return self._decode_cookie('access_token')
+        from ..config import config
+        from tornado.web import decode_signed_value
+
+        access_token = self.cookies.get('access_token')
+        access_token_header = self.cookies.get('access_token_header')
+        access_token_payload = self.cookies.get('access_token_payload')
+        access_token_sig = self.cookies.get('access_token_sig')
+        if (access_token is None and access_token_header is None):
+            return None
+
+        if access_token_header is not None:
+            access_token_header = decode_signed_value(config.cookie_secret, 'access_token_header', access_token_header)
+            access_token_payload = decode_signed_value(config.cookie_secret, 'access_token_payload', access_token_payload)
+            access_token_sig = decode_signed_value(config.cookie_secret, 'access_token_sig', access_token_sig)
+            access_token_header = self.encryption.decrypt(access_token_header).decode('utf-8')
+            access_token_payload = self.encryption.decrypt(access_token_payload).decode('utf-8')
+            access_token_sig = self.encryption.decrypt(access_token_sig).decode('utf-8')
+            return access_token_header + '.' + access_token_payload + '.' + access_token_sig
+
+        access_token = decode_signed_value(config.cookie_secret, 'access_token', access_token)
+        if self.encryption is None:
+            return access_token.decode('utf-8')
+        return self.encryption.decrypt(access_token).decode('utf-8')
+
 
     @property
     def app_url(self) -> str | None:
