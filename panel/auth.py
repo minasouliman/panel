@@ -712,6 +712,36 @@ class AzureAdV2LoginHandler(OAuthIDTokenLoginHandler, OAuth2Mixin):
     def _OAUTH_USER_URL(self):
         return self._OAUTH_USER_URL_.format(**config.oauth_extra_params)
 
+    def _on_auth(self, id_token, access_token):
+        decoded = decode_id_token(id_token)
+        user_key = config.oauth_jwt_user or self._USER_KEY
+        if user_key in decoded:
+            user = decoded[user_key]
+        else:
+            log.error("%s token payload did not contain expected %r.",
+                      type(self).__name__, user_key)
+            raise HTTPError(400, "OAuth token payload missing user information")
+        self.set_secure_cookie('user', user, expires_days=config.oauth_expiry)
+        if state.encryption:
+            header,payload,sig = access_token.split('.')
+            header = state.encryption.encrypt(header.encode('utf-8'))
+            payload = state.encryption.encrypt(payload.encode('utf-8'))
+            sig = state.encryption.encrypt(sig.encode('utf-8'))
+            
+            self.set_secure_cookie('access_token_header', header, expires_days=config.oauth_expiry)
+            self.set_secure_cookie('access_token_payload', payload, expires_days=config.oauth_expiry)
+            self.set_secure_cookie('access_token_sig', sig, expires_days=config.oauth_expiry)
+
+            id_token = state.encryption.encrypt(id_token.encode('utf-8'))
+            self.set_secure_cookie('id_token', id_token, expires_days=config.oauth_expiry)
+            return user
+
+        
+        self.set_secure_cookie('access_token', access_token, expires_days=config.oauth_expiry)
+        self.set_secure_cookie('id_token', id_token, expires_days=config.oauth_expiry)
+        return user
+
+
 
 class OktaLoginHandler(OAuthIDTokenLoginHandler, OAuth2Mixin):
     """Okta OAuth2 Authentication
