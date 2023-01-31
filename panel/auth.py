@@ -712,7 +712,7 @@ class AzureAdV2LoginHandler(OAuthIDTokenLoginHandler, OAuth2Mixin):
     def _OAUTH_USER_URL(self):
         return self._OAUTH_USER_URL_.format(**config.oauth_extra_params)
 
-    def _on_auth(self, id_token, access_token):
+    def _on_auth(self, id_token, access_token, refresh_token=None):
         decoded = decode_id_token(id_token)
         user_key = config.oauth_jwt_user or self._USER_KEY
         if user_key in decoded:
